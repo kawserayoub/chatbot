@@ -10,35 +10,52 @@ from langchain_openai import ChatOpenAI
 
 load_dotenv()
 api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
+if not api_key:
+    st.error("OPENAI_API_KEY is missing.")
+    st.stop()
 
 st.set_page_config(page_title="RAG Assistant", layout="centered")
+
+# tydliga, ögonvänliga chattbubblor med kontrast
 st.markdown("""
     <style>
-        .stApp {
-            background-color: white;
+        html, body, .stApp {
+            background-color: #f4f4f4;
+            color: #212529;
         }
-        .chat-message {
-            padding: 1rem;
-            border-radius: 10px;
-            margin-bottom: 10px;
-        }
-        .user-msg {
-            background-color: #DCF8C6;
-            text-align: right;
-        }
-        .bot-msg {
-            background-color: #F1F0F0;
-            text-align: left;
-        }
+
         .chat-container {
             max-height: 500px;
             overflow-y: auto;
             padding-bottom: 20px;
         }
+
+        .chat-message {
+            padding: 1rem;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            font-size: 16px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .user-msg {
+            background-color: #003566;
+            color: #ffffff;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .bot-msg {
+            background-color: #ffffff;
+            color: #000000;
+            margin-right: auto;
+            text-align: left;
+            border: 1px solid #dee2e6;
+        }
     </style>
 """, unsafe_allow_html=True)
 
-# init
 if "memory" not in st.session_state:
     st.session_state.memory = ChatMemory()
 if "db" not in st.session_state:
@@ -46,9 +63,8 @@ if "db" not in st.session_state:
 
 st.title("🧠 Ask Your Documents")
 
-# file upload
 with st.expander("📂 Upload TXT or PDF documents"):
-    uploaded_files = st.file_uploader("Drag and drop or browse", type=["txt", "pdf"], accept_multiple_files=True)
+    uploaded_files = st.file_uploader("Browse files", type=["txt", "pdf"], accept_multiple_files=True)
     if uploaded_files:
         with st.spinner("Indexing documents..."):
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -56,14 +72,12 @@ with st.expander("📂 Upload TXT or PDF documents"):
                     path = os.path.join(tmpdir, file.name)
                     with open(path, "wb") as f:
                         f.write(file.getvalue())
-
                 docs = load_documents(tmpdir)
                 chunks = split_documents(docs)
                 db = embed_documents(chunks, api_key)
                 st.session_state.db = db
-        st.success("✅ Documents are ready to chat with!")
+        st.success("✅ Documents are ready.")
 
-# chat UI
 if st.session_state.db:
     st.markdown("""<div class="chat-container">""", unsafe_allow_html=True)
 
@@ -74,21 +88,24 @@ if st.session_state.db:
     st.markdown("""</div>""", unsafe_allow_html=True)
 
     query = st.chat_input("Type your question...")
-    if query:
+    if query and query.strip():
         st.markdown(f"<div class='chat-message user-msg'>{query}</div>", unsafe_allow_html=True)
 
         with st.spinner("Thinking..."):
-            llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=api_key)
-            docs = expand_query(llm, query, st.session_state.db)
-            reranked = rerank(query, docs, api_key)
-            answer = generate_answer(llm, query, reranked, st.session_state.memory)
-            st.session_state.memory.add(query, answer)
+            try:
+                llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=api_key)
+                docs = expand_query(llm, query, st.session_state.db)
+                reranked = rerank(query, docs, api_key)
+                answer = generate_answer(llm, query, reranked, st.session_state.memory)
+                st.session_state.memory.add(query, answer)
 
-            placeholder = st.empty()
-            typing_text = ""
-            for word in answer.split():
-                typing_text += word + " "
-                placeholder.markdown(f"<div class='chat-message bot-msg'>{typing_text}</div>", unsafe_allow_html=True)
-                time.sleep(0.03)
-
-            st.rerun()
+                placeholder = st.empty()
+                typing_text = ""
+                for word in answer.split():
+                    typing_text += word + " "
+                    placeholder.markdown(f"<div class='chat-message bot-msg'>{typing_text}</div>", unsafe_allow_html=True)
+                    time.sleep(0.03)
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
+else:
+    st.info("Please upload documents to start.")
