@@ -3,6 +3,7 @@ import sys
 import pickle
 import faiss
 from dotenv import load_dotenv
+from PyPDF2 import PdfReader
 
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import FAISS
@@ -45,13 +46,16 @@ class chatbot:
             print(f"Folder '{self.data_folder}' not found")
             sys.exit(1)
 
-        files = [f for f in os.listdir(self.data_folder) if f.endswith(".txt")]
-        if not files:
-            print("No .txt files found in data folder")
+        txt_files = [f for f in os.listdir(self.data_folder) if f.endswith(".txt")]
+        pdf_files = [f for f in os.listdir(self.data_folder) if f.endswith(".pdf")]
+
+        if not txt_files and not pdf_files:
+            print("No .txt or .pdf files found in data folder")
             sys.exit(1)
 
         docs = []
-        for name in files:
+
+        for name in txt_files:
             path = os.path.join(self.data_folder, name)
             try:
                 with open(path, "r", encoding="utf-8") as f:
@@ -60,9 +64,23 @@ class chatbot:
             except Exception as e:
                 print(f"Failed to read {name}: {e}")
 
+        for name in pdf_files:
+            path = os.path.join(self.data_folder, name)
+            try:
+                reader = PdfReader(path)
+                text = ""
+                for page in reader.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text
+                if text.strip():
+                    docs.append(Document(page_content=text))
+            except Exception as e:
+                print(f"Failed to read {name}: {e}")
+
         splitter = TokenTextSplitter(chunk_size=self.chunk_size, chunk_overlap=self.chunk_overlap)
         chunks = splitter.split_documents(docs)
-        print(f"{len(files)} files loaded and processed into smaller parts.")
+        print(f"{len(txt_files) + len(pdf_files)} files loaded and processed into smaller parts.")
         return chunks
 
     def prepare_index(self, chunks):
@@ -137,4 +155,3 @@ class chatbot:
 
 if __name__ == "__main__":
     chatbot().run()
-
