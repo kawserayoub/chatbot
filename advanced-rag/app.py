@@ -55,8 +55,11 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Initierar chatthistorik endast en gång per session
 if "memory" not in st.session_state:
     st.session_state.memory = ChatMemory()
+    
+# Skapar plats för vektordatabas i session, undviker ominläsning vid varje prompt
 if "db" not in st.session_state:
     st.session_state.db = None
 
@@ -65,12 +68,16 @@ st.title("🧠 Ask Your Documents")
 with st.expander("📂 Upload TXT or PDF documents"):
     uploaded_files = st.file_uploader("Browse files", type=["txt", "pdf"], accept_multiple_files=True)
     if uploaded_files:
+        
+        # Temporär katalog används för att hantera filerna lokalt innan indexering
         with st.spinner("Indexing documents..."):
             with tempfile.TemporaryDirectory() as tmpdir:
                 for file in uploaded_files:
                     path = os.path.join(tmpdir, file.name)
                     with open(path, "wb") as f:
                         f.write(file.getvalue())
+                        
+                # Dokumentet laddas, chunkas och embeddas direkt, ingen cache lösning används
                 docs = load_documents(tmpdir)
                 chunks = split_documents(docs)
                 db = embed_documents(chunks, api_key)
@@ -92,9 +99,17 @@ if st.session_state.db:
 
         with st.spinner("Thinking..."):
             try:
+                
+                # Tempratur noll för deterministiska svar - lämplig vid faktabaserad analys
                 llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=api_key)
+                
+                # Query expansion ökas chansen att träffa relevant material vid vaga frågor
                 docs = expand_query(llm, query, st.session_state.db)
+                
+                # Reranking förbättrar precision genom att väga relevans efter expansion
                 reranked = rerank(query, docs, api_key)
+                
+                # Kontextuell svargenerering med chatthistorik som stöd
                 answer = generate_answer(llm, query, reranked, st.session_state.memory)
                 st.session_state.memory.add(query, answer)
 

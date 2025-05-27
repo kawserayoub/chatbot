@@ -34,6 +34,7 @@ class chatbot:
         self.db = None
         self.chat_history = []
 
+# Ger kontroll över cachbeteende
     def prompt_for_reset(self) -> bool:
         while True:
             response = input("Would you like to rebuild the system from scratch? (y/n): ").strip().lower()
@@ -78,11 +79,13 @@ class chatbot:
             except Exception as e:
                 print(f"Failed to read {name}: {e}")
 
+        # Tokenbaserad splittning minksar risken för trasiga meningar jämfört med teckenbaserad delning
         splitter = TokenTextSplitter(chunk_size=self.chunk_size, chunk_overlap=self.chunk_overlap)
         chunks = splitter.split_documents(docs)
         print(f"{len(txt_files) + len(pdf_files)} files loaded and processed into smaller parts.")
         return chunks
 
+    # Balanserar mellan snabbhet och kontroll
     def prepare_index(self, chunks):
         reset = self.prompt_for_reset()
         existing = os.path.exists(self.index_file) and os.path.exists(self.store_file)
@@ -114,6 +117,7 @@ class chatbot:
         chunks = self.load_documents()
         self.db = self.prepare_index(chunks)
 
+        # Säkerställer att modellen fokuserar på rätt underlag
         prompt = ChatPromptTemplate.from_template(
             """
             answer the question based only on the following context:

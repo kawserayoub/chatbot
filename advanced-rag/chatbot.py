@@ -26,6 +26,7 @@ def main():
     print("Welcome. You can now chat with your files.")
     rebuild = input("Rebuild vector store from scratch? (y/n): ").strip().lower() == "y"
 
+# Om ingent index finns eller användaren vill återskapa det
     if rebuild or not os.path.exists(os.path.join(store_path, "index.faiss")):
         docs = load_documents(data_path)
         chunks = split_documents(docs, chunk_size, chunk_overlap)
@@ -47,5 +48,6 @@ def main():
         memory.add(query, answer)
         print(f"\nBot: {answer}")
 
+# Ser till att koden bara körs vid direkt exekvering - möjliggör testing/import
 if __name__ == "__main__":
     main()

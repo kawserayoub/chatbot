@@ -20,14 +20,18 @@ class ChatMemory:
             context.append({"role": "assistant", "content": bot_msg})
         return context
 
+# Använder multi_query för att bredda frågan 
 def expand_query(llm: ChatOpenAI, query: str, db: FAISS) -> List[Document]:
     retriever = MultiQueryRetriever.from_llm(retriever=db.as_retriever(), llm=llm)
     return retriever.invoke(query)
 
+# Rerankar dokument baserat på kosinlikhet, förbättrar precision efter expansion
 def rerank(query: str, docs: List[Document], api_key: str, top_k: int = 5) -> List[Document]:
     embedder = OpenAIEmbeddings(openai_api_key=api_key)
     query_vec = embedder.embed_query(query)
     scored = []
+    
+    # Endast de första 1000 tecken används, förhindrar att irrelevanta partier påverkar vektorn
     for doc in docs:
         doc_vec = embedder.embed_query(doc.page_content[:1000])
         score = cosine_similarity(query_vec, doc_vec)
@@ -35,10 +39,12 @@ def rerank(query: str, docs: List[Document], api_key: str, top_k: int = 5) -> Li
     scored.sort(reverse=True, key=lambda x: x[0])
     return [doc for _, doc in scored[:top_k]]
 
+# Standardformel för kosinliket, används för semantisk jämförelse mellan embeddings
 def cosine_similarity(a: List[float], b: List[float]) -> float:
     a, b = np.array(a), np.array(b)
     return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
+# Inkluderar chathistorik och kontext-dokumnet i prompten, maximerar relevans i svaret
 def generate_answer(llm: ChatOpenAI, query: str, context_docs: List[Document], memory: ChatMemory) -> str:
     context_text = "\n\n".join(doc.page_content for doc in context_docs)
     messages = memory.to_context()
