@@ -16,7 +16,6 @@ if not api_key:
 
 st.set_page_config(page_title="RAG Assistant", layout="centered")
 
-# tydliga, ögonvänliga chattbubblor med kontrast
 st.markdown("""
     <style>
         html, body, .stApp {
